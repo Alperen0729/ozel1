@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<title>Kalp Vurma Oyunu</title>
+<style>
+ body{margin:0;overflow:hidden;background:#ffc0cb;font-family:sans-serif}
+ canvas{display:block;margin:0 auto;background:#ffd6e7}
+</style>
+</head>
+<body>
+<canvas id="game"></canvas>
+<script>
+const canvas=document.getElementById("game");
+const ctx=canvas.getContext("2d");
+canvas.width=window.innerWidth;
+canvas.height=window.innerHeight;
+
+let hits=0;
+let finished=false;
+let heart=null;
+let shake=0;
+let bgHearts=[];
+let particles=[];
+let messageAnim=0;
+
+function newHeart(){
+ heart={
+  x:Math.random()*(canvas.width-200)+100,
+  y:Math.random()*(canvas.height-200)+100,
+  base:40,
+  phase:0
+ };
+}
+newHeart();
+
+for(let i=0;i<25;i++){
+ bgHearts.push({
+  x:Math.random()*canvas.width,
+  y:Math.random()*canvas.height,
+  size:10+Math.random()*10,
+  speed:0.3+Math.random()*0.7
+ });
+}
+
+canvas.addEventListener("touchstart",tap);
+canvas.addEventListener("mousedown",tap);
+
+function popSound(){
+ const ctxAudio=new (window.AudioContext||window.webkitAudioContext)();
+ const osc=ctxAudio.createOscillator();
+ const gain=ctxAudio.createGain();
+ osc.type="triangle";
+ osc.frequency.value=600;
+ gain.gain.value=0.2;
+ osc.connect(gain);
+ gain.connect(ctxAudio.destination);
+ osc.start();
+ osc.frequency.exponentialRampToValueAtTime(200,ctxAudio.currentTime+0.15);
+ gain.gain.exponentialRampToValueAtTime(0.001,ctxAudio.currentTime+0.15);
+ osc.stop(ctxAudio.currentTime+0.15);
+}
+
+function createParticles(x,y){
+ for(let i=0;i<15;i++){
+  particles.push({
+   x:x,
+   y:y,
+   dx:(Math.random()-0.5)*4,
+   dy:(Math.random()-0.5)*4,
+   life:40
+  });
+ }
+}
+
+function tap(e){
+ if(finished) return;
+
+ let rect=canvas.getBoundingClientRect();
+ let x=(e.touches?e.touches[0].clientX:e.clientX)-rect.left;
+ let y=(e.touches?e.touches[0].clientY:e.clientY)-rect.top;
+
+ let dx=x-heart.x;
+ let dy=y-heart.y;
+ let hitRadius=heart.base*1.6;
+
+ if(Math.sqrt(dx*dx+dy*dy)<hitRadius){
+  hits++;
+  popSound();
+  if(navigator.vibrate) navigator.vibrate(80);
+  shake=10;
+  createParticles(heart.x,heart.y);
+
+  if(hits>=10){
+   finished=true;
+  }else newHeart();
+ }
+}
+
+function drawHeart(x,y,s,color="red"){
+ ctx.beginPath();
+ ctx.moveTo(x,y);
+ ctx.bezierCurveTo(x-s,y-s,x-2*s,y+s,x,y+2*s);
+ ctx.bezierCurveTo(x+2*s,y+s,x+s,y-s,x,y);
+ ctx.fillStyle=color;
+ ctx.fill();
+}
+
+function drawFlower(x,y){
+ for(let i=0;i<6;i++){
+  let angle=i*Math.PI/3;
+  ctx.beginPath();
+  ctx.arc(x+Math.cos(angle)*8,y+Math.sin(angle)*8,6,0,Math.PI*2);
+  ctx.fillStyle="#ff69b4";
+  ctx.fill();
+ }
+ ctx.beginPath();
+ ctx.arc(x,y,6,0,Math.PI*2);
+ ctx.fillStyle="#ffd700";
+ ctx.fill();
+}
+
+function draw(){
+ ctx.save();
+ if(shake>0){
+  ctx.translate((Math.random()-0.5)*shake,(Math.random()-0.5)*shake);
+  shake--;
+ }
+
+ ctx.clearRect(0,0,canvas.width,canvas.height);
+
+ bgHearts.forEach(h=>{
+  h.y-=h.speed;
+  if(h.y<-20) h.y=canvas.height+20;
+  drawHeart(h.x,h.y,h.size,"#ff9ecb");
+ });
+
+ for(let y=40;y<canvas.height;y+=80){
+  drawFlower(20,y);
+  drawFlower(canvas.width-20,y);
+ }
+
+ if(!finished){
+  heart.phase+=0.08;
+  let size=heart.base + Math.sin(heart.phase)*6;
+  drawHeart(heart.x,heart.y,size);
+ }
+
+ particles.forEach(p=>{
+  p.x+=p.dx;
+  p.y+=p.dy;
+  p.life--;
+  ctx.globalAlpha=p.life/40;
+  drawHeart(p.x,p.y,8);
+  ctx.globalAlpha=1;
+ });
+ particles=particles.filter(p=>p.life>0);
+
+ ctx.fillStyle="#c2185b";
+ ctx.font="30px sans-serif";
+ ctx.fillText("Vurulan: "+hits+" / 10",20,40);
+
+ if(finished){
+  messageAnim+=0.03;
+  let scale=1+Math.sin(messageAnim)*0.05;
+  ctx.save();
+  ctx.translate(canvas.width/2,canvas.height/2);
+  ctx.scale(scale,scale);
+  ctx.fillStyle="#ad1457";
+  ctx.font="bold 50px sans-serif";
+  ctx.textAlign="center";
+  ctx.fillText("MESAJ BURAYA GELECEK",0,0);
+  ctx.restore();
+ }
+
+ ctx.restore();
+}
+
+function loop(){
+ draw();
+ requestAnimationFrame(loop);
+}
+loop();
+</script>
+</body>
+</html>
